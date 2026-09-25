@@ -11,7 +11,7 @@ jobs:
   macos:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: swift run MeetingAssistantChecks
       - run: zsh Scripts/build-app.sh release
       - name: Package macOS app
@@ -21,7 +21,7 @@ jobs:
           cp -R .build/MeetingAssistant.app dmg-root/
           ln -s /Applications dmg-root/Applications
           hdiutil create -volname MeetingAssistant -srcfolder dmg-root -ov -format UDZO MeetingAssistant-macOS-arm64.dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos
           path: |
@@ -31,8 +31,8 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -46,7 +46,7 @@ jobs:
           python -c "from PIL import Image; Image.open('Resources/AppIcon.png').save('Resources/AppIcon.ico', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])"
           pyinstaller --noconfirm --clean --onefile --windowed --name MeetingAssistant-Windows --icon Resources/AppIcon.ico --collect-all faster_whisper --collect-all ctranslate2 --collect-all av --collect-all soundcard --collect-all keyring windows/meeting_assistant.py
           Compress-Archive -Path dist/MeetingAssistant-Windows.exe -DestinationPath MeetingAssistant-Windows-x64.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: MeetingAssistant-Windows-x64.zip
@@ -55,7 +55,7 @@ jobs:
     needs: [macos, windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: release
           merge-multiple: true
