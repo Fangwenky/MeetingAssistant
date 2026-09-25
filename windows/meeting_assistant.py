@@ -390,24 +390,32 @@ class MeetingApp:
             else:
                 device = sc.default_microphone()
                 if device is None: raise RuntimeError("没有找到默认麦克风")
-            utterance = np.empty(0, dtype=np.float32); utterance_start = 0.0; silence = 0; since_decode = 0
-            with device.recorder(samplerate=SAMPLE_RATE, channels=1) as recorder:
+            def record_session() -> None:
+                utterance = np.empty(0, dtype=np.float32); utterance_start = 0.0; silence = 0; since_decode = 0
+                with device.recorder(samplerate=SAMPLE_RATE, channels=1) as recorder:
+                    while self.active and (source != "me" or self.mic_enabled):
+                        chunk = np.asarray(recorder.record(numframes=SAMPLE_RATE // 2), dtype=np.float32).reshape(-1)
+                        end_time = time.monotonic() - self.started; self.archive.write(source, chunk, end_time)
+                        voice = math.sqrt(float(np.mean(chunk * chunk))) >= .006
+                        if len(utterance) == 0:
+                            if not voice: continue
+                            utterance_start = max(0, end_time - len(chunk) / SAMPLE_RATE)
+                        utterance = np.concatenate((utterance, chunk)); since_decode += len(chunk); silence = 0 if voice else silence + len(chunk)
+                        final = silence >= int(.8 * SAMPLE_RATE) or len(utterance) >= 15 * SAMPLE_RATE
+                        if final:
+                            self.transcriber.submit(source, utterance, utterance_start, True); utterance = np.empty(0, dtype=np.float32); silence = since_decode = 0
+                        elif since_decode >= 2 * SAMPLE_RATE:
+                            self.transcriber.submit(source, utterance[-10 * SAMPLE_RATE:], max(utterance_start, end_time - 10), False); since_decode = 0
+                    if len(utterance): self.transcriber.submit(source, utterance, utterance_start, True)
+
+            if source == "others":
+                record_session()
+            else:
                 while self.active:
-                    if source == "me" and not self.mic_enabled:
-                        time.sleep(.1); continue
-                    chunk = np.asarray(recorder.record(numframes=SAMPLE_RATE // 2), dtype=np.float32).reshape(-1)
-                    end_time = time.monotonic() - self.started; self.archive.write(source, chunk, end_time)
-                    voice = math.sqrt(float(np.mean(chunk * chunk))) >= .006
-                    if len(utterance) == 0:
-                        if not voice: continue
-                        utterance_start = max(0, end_time - len(chunk) / SAMPLE_RATE)
-                    utterance = np.concatenate((utterance, chunk)); since_decode += len(chunk); silence = 0 if voice else silence + len(chunk)
-                    final = silence >= int(.8 * SAMPLE_RATE) or len(utterance) >= 15 * SAMPLE_RATE
-                    if final:
-                        self.transcriber.submit(source, utterance, utterance_start, True); utterance = np.empty(0, dtype=np.float32); silence = since_decode = 0
-                    elif since_decode >= 2 * SAMPLE_RATE:
-                        self.transcriber.submit(source, utterance[-10 * SAMPLE_RATE:], max(utterance_start, end_time - 10), False); since_decode = 0
-                if len(utterance): self.transcriber.submit(source, utterance, utterance_start, True)
+                    while self.active and not self.mic_enabled:
+                        time.sleep(.1)
+                    if self.active:
+                        record_session()
         except Exception as error:
             self.events.put(("error", f"{source_name(source)}音频采集失败：{error}"))
 

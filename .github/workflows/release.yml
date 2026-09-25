@@ -45,6 +45,8 @@ jobs:
         run: |
           python -c "from PIL import Image; Image.open('Resources/AppIcon.png').save('Resources/AppIcon.ico', sizes=[(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)])"
           pyinstaller --noconfirm --clean --onefile --windowed --name MeetingAssistant-Windows --icon Resources/AppIcon.ico --collect-all faster_whisper --collect-all ctranslate2 --collect-all av --collect-all soundcard --collect-all keyring windows/meeting_assistant.py
+          $check = Start-Process -FilePath dist/MeetingAssistant-Windows.exe -ArgumentList '--self-check' -Wait -PassThru
+          if ($check.ExitCode -ne 0) { throw "Packaged Windows self-check failed with exit code $($check.ExitCode)" }
           Compress-Archive -Path dist/MeetingAssistant-Windows.exe -DestinationPath MeetingAssistant-Windows-x64.zip
       - uses: actions/upload-artifact@v7
         with:
